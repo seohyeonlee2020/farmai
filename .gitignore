@@ -1,0 +1,18 @@
+#training data (pdf files)
+farmai_training_data/
+
+# Vector embeddings and processed data
+embeddings/
+*.db
+*.sqlite
+text_data.json
+
+# Logs
+*.log
+gt
+# Cache
+__pycache__/
+.streamlit/
+
+# Environment
+.env
