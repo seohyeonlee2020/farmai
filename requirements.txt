@@ -13,4 +13,5 @@ streamlit
 requests
 langchain_text_splitters
 pdf2image
+pysqlite3-binary
 
