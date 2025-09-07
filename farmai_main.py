@@ -9,6 +9,8 @@ import logging
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain.schema import Document
 from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.vectorstores import FAISS
+
 
 os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 
@@ -66,7 +68,7 @@ def prepare_documents():
     )
     return text_splitter.split_documents(data)
 
-from langchain_community.vectorstores import FAISS
+
 @st.cache_resource
 def create_vectorstore():
     """Create and return vectorstore with embeddings"""
