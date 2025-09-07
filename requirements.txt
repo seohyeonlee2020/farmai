@@ -7,12 +7,9 @@ chromadb
 tiktoken
 sentence_transformers==2.7.0
 langchain_huggingface
-langchain
 langchain_community
 streamlit
-time
 requests
-logging
 langchain_text_splitters
-langchain_schema
+
 
