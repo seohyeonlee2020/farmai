@@ -9,8 +9,6 @@ import logging
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain.schema import Document
 from langchain_huggingface import HuggingFaceEmbeddings
-#from langchain_chroma import Chroma
-
 
 os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 
