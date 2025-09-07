@@ -1,5 +1,4 @@
 pypdf
-poppler
 pytesseract
 transformers
 langchain
@@ -7,7 +6,14 @@ accelerate
 chromadb
 tiktoken
 sentence_transformers==2.7.0
-python-dotenv
 langchain_huggingface
 langchain
 langchain_community
+streamlit
+json
+time
+requests
+logging
+langchain_text_splitters
+langchain_schema
+
