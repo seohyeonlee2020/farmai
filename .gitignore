@@ -5,7 +5,6 @@ farmai_training_data/
 embeddings/
 *.db
 *.sqlite
-text_data.json
 
 # Logs
 *.log
