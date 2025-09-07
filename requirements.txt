@@ -11,5 +11,6 @@ langchain_community
 streamlit
 requests
 langchain_text_splitters
-
+pdf2image
+poppler-utils
 
