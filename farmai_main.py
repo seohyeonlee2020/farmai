@@ -9,7 +9,10 @@ import logging
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain.schema import Document
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_chroma import Chroma
+#from langchain_chroma import Chroma
+
+
+os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 
 @st.cache_data
 def load_text_data():
@@ -65,15 +68,14 @@ def prepare_documents():
     )
     return text_splitter.split_documents(data)
 
+from langchain_community.vectorstores import FAISS
 @st.cache_resource
 def create_vectorstore():
     """Create and return vectorstore with embeddings"""
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-    vectorstore = Chroma.from_documents(
+    vectorstore = FAISS.from_documents(
         documents=prepare_documents(),
-        collection_name="farmai-embeddings",
-        embedding=embeddings,
-        persist_directory="./embeddings"
+        embedding=embeddings
     )
     return vectorstore
 
