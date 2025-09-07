@@ -3,7 +3,7 @@ import os
 import json
 import time
 import requests
-from utils.text_data_preprocessing import *
+from text_data_preprocessing import *
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain.schema import Document
