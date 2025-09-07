@@ -120,7 +120,7 @@ st.title("FarmAI: Climate-Smart Farming Assistant")
 # Check Ollama status
 if not check_ollama_status():
     st.error("⚠️ Ollama is not running. Start it with 'ollama serve'")
-    st.stop()
+    #st.stop()
 
 
 # User input
