@@ -10,7 +10,6 @@ langchain_huggingface
 langchain
 langchain_community
 streamlit
-json
 time
 requests
 logging
