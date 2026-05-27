@@ -24,12 +24,14 @@ except ImportError as e:
 # Import LangChain components with error handling
 try:
     from langchain_text_splitters import RecursiveCharacterTextSplitter
-    from langchain.schema import Document
+    from langchain_core.documents import Document
     from langchain_huggingface import HuggingFaceEmbeddings
     from langchain_community.vectorstores import FAISS
 except ImportError as e:
     st.error(f"Error importing LangChain components: {e}")
-    st.info("Please ensure all required packages are installed. See requirements below.")
+    st.info(
+        "Please ensure all required packages are installed. See requirements below."
+    )
     st.code("""
     pip install langchain
     pip install langchain-community
@@ -44,11 +46,8 @@ except ImportError as e:
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('app.log')
-    ]
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(), logging.FileHandler("app.log")],
 )
 
 
@@ -63,11 +62,11 @@ def load_text_data():
                 return {}
 
             text_data = extract_text(directory)
-            with open('text_data.json', 'w', encoding='utf-8') as fp:
+            with open("text_data.json", "w", encoding="utf-8") as fp:
                 json.dump(text_data, fp, ensure_ascii=False, indent=2)
             return text_data
         else:
-            with open('text_data.json', 'r', encoding='utf-8') as f:
+            with open("text_data.json", "r", encoding="utf-8") as f:
                 text_data = json.load(f)
                 return text_data
     except Exception as e:
@@ -104,8 +103,8 @@ def dict_to_documents(file_dict):
                 "filename": os.path.basename(filename),
                 "file_extension": os.path.splitext(filename)[1],
                 "char_count": len(content),
-                "word_count": len(content.split())
-            }
+                "word_count": len(content.split()),
+            },
         )
         documents.append(doc)
 
@@ -133,7 +132,7 @@ def prepare_documents():
             chunk_overlap=50,  # Increased overlap for continuity
             separators=["\n\n", "\n", ". ", "? ", "! ", " ", ""],
             keep_separator=True,
-            length_function=len
+            length_function=len,
         )
 
         split_docs = text_splitter.split_documents(data)
@@ -158,23 +157,14 @@ def create_vectorstore():
         # Initialize embeddings with explicit device configuration
         embeddings = HuggingFaceEmbeddings(
             model_name="all-MiniLM-L6-v2",
-            model_kwargs={
-                'device': 'cpu',
-                'trust_remote_code': False
-            },
-            encode_kwargs={
-                'normalize_embeddings': True,
-                'batch_size': 32
-            }
+            model_kwargs={"device": "cpu", "trust_remote_code": False},
+            encode_kwargs={"normalize_embeddings": True, "batch_size": 32},
         )
 
         logging.info(f"Creating FAISS vectorstore with {len(documents)} documents")
 
         # Create vectorstore with error handling
-        vectorstore = FAISS.from_documents(
-            documents=documents,
-            embedding=embeddings
-        )
+        vectorstore = FAISS.from_documents(documents=documents, embedding=embeddings)
 
         logging.info("Successfully created FAISS vectorstore")
         return vectorstore
@@ -213,9 +203,9 @@ def load_vectorstore():
 def load_prompt_template():
     """Load prompt template from file with fallback"""
     try:
-        template_path = 'utils/prompt_template.txt'
+        template_path = "utils/prompt_template.txt"
         if os.path.exists(template_path):
-            with open(template_path, 'r', encoding='utf-8') as f:
+            with open(template_path, "r", encoding="utf-8") as f:
                 return f.read().strip()
         else:
             logging.warning(f"Prompt template file not found: {template_path}")
@@ -237,7 +227,7 @@ Answer: Provide a clear, practical answer based on the context above. If the con
 def check_ollama_status():
     """Check if Ollama is running and accessible"""
     try:
-        response = requests.get('http://localhost:11434/api/tags', timeout=5)
+        response = requests.get("http://localhost:11434/api/tags", timeout=5)
         if response.status_code == 200:
             return True, "Ollama is running"
         else:
@@ -254,25 +244,25 @@ def call_ollama(prompt, model):
     """Send prompt to Ollama API with improved error handling"""
     try:
         response = requests.post(
-            'http://localhost:11434/api/generate',
+            "http://localhost:11434/api/generate",
             json={
-                'model': model,
-                'prompt': prompt,
-                'stream': False,
-                'options': {
-                    'num_ctx': 2048,
-                    'temperature': 0.4,
-                    'top_p': 0.9,
-                    'max_tokens': 512
+                "model": model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "num_ctx": 2048,
+                    "temperature": 0.4,
+                    "top_p": 0.9,
+                    "max_tokens": 512,
                 },
-                "keep_alive": 0
+                "keep_alive": 0,
             },
-            timeout=60  # Increased timeout for model processing
+            timeout=60,  # Increased timeout for model processing
         )
 
         if response.status_code == 200:
             result = response.json()
-            return result.get('response', 'No response generated')
+            return result.get("response", "No response generated")
         else:
             return f"Ollama API Error: HTTP {response.status_code} - {response.text}"
 
@@ -289,12 +279,11 @@ st.set_page_config(
     page_title="AgriAdvice: Climate-Smart Farming Assistant",
     page_icon="🌱",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
 # Main App
-st.title("AgriAdvice: Climate-Smart Farming Assistant")
-st.markdown("*Your AI-powered companion for sustainable farming practices*")
+st.title("AgriAdvice: Farming Advice Delivered Offline")
 
 # Check Ollama status in sidebar
 with st.sidebar:
@@ -317,136 +306,152 @@ with st.sidebar:
         st.success("Cache cleared!")
         st.rerun()
 
-# Main interface
-col1, col2 = st.columns([3, 1])
-
-with col1:
-    user_question = st.text_input(
-        "Ask your farming question:",
-        placeholder="e.g., How can I improve soil health for tomato cultivation?",
-        help="Ask about climate-smart farming practices, crop management, soil health, etc."
-    )
-
-with col2:
-    model_choice = st.selectbox(
-        "Model:",
-        ["qwen2:0.5b", "qwen3:0.6b", "tinyllama"],
-        index=0
-    )
-
-#load vectorstore
-if 'vectorstore' not in st.session_state:
+# setup
+# load vectorstore
+if "vectorstore" not in st.session_state:
     with st.spinner("Building vectorstore... this only happens once."):
         # Make sure this function actually RETURNS the object
         st.session_state.vectorstore = create_vectorstore()
 
-# Process user input
-if user_question:
-    if not ollama_running:
-        st.warning("⚠️ Ollama is not running. Please start Ollama to get responses.")
-    else:
-        try:
-            logging.info(f"Processing user question: {user_question}")
+# add message history
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-            # Create progress indicator
-            progress_bar = st.progress(0)
-            status_text = st.empty()
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-            # Step 1: Retrieve relevant documents
-            status_text.text("🔍 Searching for relevant documents...")
-            progress_bar.progress(25)
+# Main UI
+col1, col2 = st.columns([3, 1])
 
-            retrieved_docs = st.session_state.vectorstore.similarity_search(
-                user_question,
-                k=3  # Get more documents for better context
-            )
+with col1:
+    # Process user input
+    if user_question := st.chat_input(
+        placeholder="e.g., How can I improve soil health to grow tomatoes?",
+    ):
+        st.session_state.messages.append({"role": "user", "content": user_question})
+        with st.chat_message("user"):
+            st.markdown(user_question)
 
-            logging.info(f"Retrieved {len(retrieved_docs)} documents")
-
-            # Step 2: Process documents
-            progress_bar.progress(50)
-            status_text.text("📄 Processing retrieved documents...")
-
-            if not retrieved_docs:
-                st.warning("❓ No relevant documents found. Try rephrasing your question or using more specific terms.")
-                logging.warning("No documents retrieved for user question")
-            else:
-                # Create context from retrieved docs
-                context_texts = "\n\n".join([
-                    f"Source: {doc.metadata.get('filename', 'Unknown')}\n{doc.page_content}"
-                    for doc in retrieved_docs
-                ])
-
-                print("context being added", context_texts)
-
-                # Step 3: Generate response
-                progress_bar.progress(75)
-                status_text.text("🤖 Generating AI response...")
-
-                # Load and format prompt
-                prompt_template = load_prompt_template()
-                prompt = prompt_template.format(
-                    combined_context=context_texts,
-                    user_question=user_question
+        with st.chat_message("assistant"):
+            if not ollama_running:
+                st.warning(
+                    "⚠️ Ollama is not running. Please start Ollama to get responses."
                 )
+            else:
+                try:
+                    logging.info(f"Processing user question: {user_question}")
 
-                # Generate response
-                logging.info(f"Generating response with model: {model_choice}")
+                    # Create progress indicator
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
 
-                start_time = time.time()
-                llm_response = call_ollama(prompt, model_choice)
-                end_time = time.time()
+                    # Step 1: Retrieve relevant documents
+                    status_text.text("🔍 Searching for relevant documents...")
+                    progress_bar.progress(25)
 
-                # Complete progress
-                progress_bar.progress(100)
-                status_text.text("✅ Response generated!")
+                    retrieved_docs = st.session_state.vectorstore.similarity_search(
+                        user_question,
+                        k=3,  # Get more documents for better context
+                    )
 
-                # Clear progress indicators
-                time.sleep(0.5)
-                progress_bar.empty()
-                status_text.empty()
+                    logging.info(f"Retrieved {len(retrieved_docs)} documents")
 
-                # Display results
-                response_time = end_time - start_time
-                logging.info(f"Total response time: {response_time:.2f} seconds")
+                    # Step 2: Process documents
+                    progress_bar.progress(50)
+                    status_text.text("📄 Processing retrieved documents...")
 
-                # Show response
-                st.markdown("### 🎯 Answer")
-                st.markdown(llm_response)
+                    if not retrieved_docs:
+                        st.warning(
+                            "❓ No relevant documents found. Try rephrasing your question or using more specific terms."
+                        )
+                        logging.warning("No documents retrieved for user question")
+                    else:
+                        # Create context from retrieved docs
+                        context_texts = "\n\n".join(
+                            [
+                                f"Source: {doc.metadata.get('filename', 'Unknown')}\n{doc.page_content}"
+                                for doc in retrieved_docs
+                            ]
+                        )
 
-                # Show metadata
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("⏱️ Response Time", f"{response_time:.2f}s")
-                with col2:
-                    st.metric("📚 Sources Found", len(retrieved_docs))
-                with col3:
-                    st.metric("🤖 Model Used", model_choice)
+                        print("context being added", context_texts)
 
-                # Show debug info in expandable section
-                with st.expander("🔍 Source Documents & Debug Info"):
-                    st.markdown("**Retrieved Documents:**")
-                    for i, doc in enumerate(retrieved_docs, 1):
-                        with st.container():
-                            st.markdown(f"**📄 Document {i}: {doc.metadata.get('filename', 'Unknown')}**")
-                            st.markdown(f"*Characters: {doc.metadata.get('char_count', 'N/A')} | Words: {doc.metadata.get('word_count', 'N/A')}*")
-                            st.markdown(f"```\n{doc.page_content[:300]}{'...' if len(doc.page_content) > 300 else ''}\n```")
-                            st.markdown("---")
+                        # Step 3: Generate response
+                        progress_bar.progress(75)
+                        status_text.text("🤖 Generating AI response...")
 
-        except Exception as e:
-            error_msg = f"Error processing your question: {str(e)}"
-            logging.error(error_msg)
-            st.error(f"❌ {error_msg}")
+                        # Load and format prompt
+                        prompt_template = load_prompt_template()
+                        prompt = prompt_template.format(
+                            combined_context=context_texts, user_question=user_question
+                        )
 
-            with st.expander("🔧 Troubleshooting"):
-                st.markdown("""
-                **Common solutions:**
-                1. **Restart the application** - Sometimes a fresh start helps
-                2. **Clear the cache** - Use the sidebar button to clear cached data
-                3. **Check Ollama** - Ensure Ollama is running and responsive
-                4. **Verify data files** - Ensure training data directory exists
-                5. **Update dependencies** - Make sure all packages are up to date
-                """)
+                        # Generate response
+                        logging.info(f"Generating response with model: {model_choice}")
+
+                        start_time = time.time()
+                        llm_response = call_ollama(prompt, model_choice)
+                        end_time = time.time()
+
+                        # Complete progress
+                        progress_bar.progress(100)
+                        status_text.text("✅ Response generated!")
+
+                        # Clear progress indicators
+                        time.sleep(0.5)
+                        progress_bar.empty()
+                        status_text.empty()
+
+                        # Display results
+                        response_time = end_time - start_time
+                        logging.info(
+                            f"Total response time: {response_time:.2f} seconds"
+                        )
+
+                        # Show response
+                        st.markdown("### 🎯 Answer")
+                        st.markdown(llm_response)
+
+                        # Show metadata
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("⏱️ Response Time", f"{response_time:.2f}s")
+                        with col2:
+                            st.metric("📚 Sources Found", len(retrieved_docs))
+                        with col3:
+                            st.metric("🤖 Model Used", model_choice)
+
+                        # Show debug info in expandable section
+                        with st.expander("🔍 Source Documents & Debug Info"):
+                            st.markdown("**Retrieved Documents:**")
+                            for i, doc in enumerate(retrieved_docs, 1):
+                                with st.container():
+                                    st.markdown(
+                                        f"**📄 Document {i}: {doc.metadata.get('filename', 'Unknown')}**"
+                                    )
+                                    st.markdown(
+                                        f"*Characters: {doc.metadata.get('char_count', 'N/A')} | Words: {doc.metadata.get('word_count', 'N/A')}*"
+                                    )
+                                    st.markdown(
+                                        f"```\n{doc.page_content[:300]}{'...' if len(doc.page_content) > 300 else ''}\n```"
+                                    )
+                                    st.markdown("---")
+
+                except Exception as e:
+                    error_msg = f"Error processing your question: {str(e)}"
+                    logging.error(error_msg)
+                    st.error(f"❌ {error_msg}")
+
+                with st.expander("🔧 Troubleshooting"):
+                    st.markdown("""
+                        **Common solutions:**
+                        1. **Restart the application** - Sometimes a fresh start helps
+                        2. **Clear the cache** - Use the sidebar button to clear cached data
+                        3. **Check Ollama** - Ensure Ollama is running and responsive
+                        4. **Verify data files** - Ensure training data directory exists
+                        5. **Update dependencies** - Make sure all packages are up to date
+                        """)
 
 # Footer
 st.markdown("---")
@@ -454,3 +459,9 @@ st.markdown(
     "🌱 **Agriadvice** - Powered by AI for sustainable agriculture | "
     f"Built with Streamlit • LangChain • FAISS • Ollama"
 )
+
+
+with col2:
+    model_choice = st.selectbox(
+        "Model:", ["qwen2:0.5b", "qwen3:0.6b", "tinyllama"], index=0
+    )
