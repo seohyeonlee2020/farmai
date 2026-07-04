@@ -1,4 +1,4 @@
-# AgriAdvice: Offline RAG chatbot to address the digital divide
+# Offline RAG + sLM. No GPU required. 
 
 Offline AI model adapted to deliver farming advice in low-connectivity areas. Scaled ambitious idea from a classmate ("AI on flip phone offline") to a technologically viable architecture. Uses RAG with a small language model to keep answers evidence-based. Optimized for extremely low-resource contexts. Focused on gaps like limited device access and unreliable internet connectivity.
 
