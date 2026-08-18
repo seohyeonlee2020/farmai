@@ -1,15 +1,23 @@
-import streamlit as st
+# CRITICAL: Set environment variables BEFORE any other imports
 import os
+import sys
+
+os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
+os.environ["PROTOBUF_PYTHON_IMPLEMENTATION"] = "python"
+
+# Force Python to prioritize local root directory
+root_path = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, root_path)
+
+import streamlit as st
 import json
 import time
 import requests
 import logging
 import warnings
+import faulthandler
 
-# CRITICAL: Set environment variables BEFORE any other imports
-os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
-os.environ["PROTOBUF_PYTHON_IMPLEMENTATION"] = "python"
-
+faulthandler.enable()
 # Suppress protobuf warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="google.protobuf")
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -56,7 +64,7 @@ def load_text_data():
     """Load text data from JSON file or extract from directory"""
     try:
         if not os.path.exists("./text_data.json"):
-            directory = "./farmai_training_data"
+            directory = "./chatbot_training_data"
             if not os.path.exists(directory):
                 st.error(f"Training data directory '{directory}' not found!")
                 return {}
@@ -145,8 +153,31 @@ def prepare_documents():
         return []
 
 
+# split off embedding setup from create_vectorstore()
 @st.cache_resource
-def create_vectorstore():
+def create_embeddings():
+    try:
+        model_name = "all-MiniLM-L6-v2"
+        cache_path = "./model_weights"
+        # Initialize and save embeddings
+        embeddings = HuggingFaceEmbeddings(
+            model_name=model_name,
+            cache_folder=cache_path,
+            model_kwargs={"device": "cpu", "trust_remote_code": False},
+            encode_kwargs={"normalize_embeddings": True, "batch_size": 32},
+        )
+        logging.info(f"Creating embeddings with model {model_name}")
+        return embeddings
+
+    except Exception as e:
+        error_msg = f"Error creating embeddings: {str(e)}"
+        st.error(error_msg)
+        logging.error(error_msg)
+        raise
+
+
+@st.cache_resource
+def create_save_vectorstore():
     """Create and return vectorstore with embeddings"""
     try:
         # Get prepared documents
@@ -155,16 +186,17 @@ def create_vectorstore():
             raise ValueError("No documents available to create vectorstore")
 
         # Initialize embeddings with explicit device configuration
-        embeddings = HuggingFaceEmbeddings(
-            model_name="all-MiniLM-L6-v2",
-            model_kwargs={"device": "cpu", "trust_remote_code": False},
-            encode_kwargs={"normalize_embeddings": True, "batch_size": 32},
-        )
+        embeddings = create_embeddings()
 
         logging.info(f"Creating FAISS vectorstore with {len(documents)} documents")
 
-        # Create vectorstore with error handling
+        # Create FAISS vectorstore with error handling
         vectorstore = FAISS.from_documents(documents=documents, embedding=embeddings)
+
+        # Persist FAISS
+        index_path = "./faiss_index"
+        vectorstore.save_local(index_path)
+        print(f"Index saved to {index_path}")
 
         logging.info("Successfully created FAISS vectorstore")
         return vectorstore
@@ -177,11 +209,26 @@ def create_vectorstore():
 
 
 def load_vectorstore():
-    """Initialize vectorstore once per session with proper error handling"""
+    """Load or Initialize vectorstore once per session with proper error handling"""
     try:
+        # load
         if "vectorstore" not in st.session_state:
             with st.spinner("🔄 Loading knowledge base... This may take a moment."):
-                st.session_state.vectorstore = create_vectorstore()
+                index_path = "./faiss_index"
+                # if vectorstore (index.faiss) exists in faiss_index
+                if os.path.exists(index_path) and os.path.isfile(
+                    os.path.join(index_path, "index.faiss")
+                ):
+                    # get embeddings to load vectorstore
+                    embeddings = create_embeddings()
+                    print("Loading existing FAISS index...")
+                    st.session_state.vectorstore = FAISS.load_local(
+                        index_path,
+                        embeddings,
+                        allow_dangerous_deserialization=True,  # Required for loading pickled data
+                    )
+                else:
+                    st.session_state.vectorstore = create_save_vectorstore()
             st.success("✅ Knowledge base loaded successfully!")
         return True
     except Exception as e:
@@ -195,7 +242,7 @@ def load_vectorstore():
             st.write("1. Check if training data directory exists")
             st.write("2. Verify protobuf version compatibility")
             st.write("3. Restart the application")
-            st.write("4. Clear Streamlit cache")
+            st.write("4. Streamlit cache")
         return False
 
 
@@ -210,14 +257,15 @@ def load_prompt_template():
         else:
             logging.warning(f"Prompt template file not found: {template_path}")
             # Return default template
-            return """Based on the following farming knowledge context, provide a helpful and accurate answer to the user's question.
+            return """Based on the following knowledge context, provide a helpful and accurate answer to the user's question.
 
 Context:
 {combined_context}
 
 Question: {user_question}
 
-Answer: Provide a clear, practical answer based on the context above. If the context doesn't contain relevant information, acknowledge this and provide general farming guidance where appropriate."""
+Answer: Provide a clear, practical answer based on the context above.
+If the context doesn't contain relevant information, acknowledge this and provide general guidance where appropriate."""
 
     except Exception as e:
         logging.error(f"Error loading prompt template: {str(e)}")
@@ -276,14 +324,14 @@ def call_ollama(prompt, model):
 
 # Streamlit App Configuration
 st.set_page_config(
-    page_title="AgriAdvice: Climate-Smart Farming Assistant",
+    page_title="Advice Delivered Offline",
     page_icon="🌱",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # Main App
-st.title("AgriAdvice: Farming Advice Delivered Offline")
+st.title("Offline RAG + sLM")
 
 # Check Ollama status in sidebar
 with st.sidebar:
@@ -306,12 +354,14 @@ with st.sidebar:
         st.success("Cache cleared!")
         st.rerun()
 
+    # add model choice here?
+    model_choice = st.selectbox(
+        "Model:", ["qwen2:0.5b", "qwen3:0.6b", "tinyllama"], index=0
+    )
+
 # setup
 # load vectorstore
-if "vectorstore" not in st.session_state:
-    with st.spinner("Building vectorstore... this only happens once."):
-        # Make sure this function actually RETURNS the object
-        st.session_state.vectorstore = create_vectorstore()
+load_vectorstore()
 
 # add message history
 if "messages" not in st.session_state:
@@ -322,129 +372,108 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 # Main UI
-col1, col2 = st.columns([3, 1])
 
-with col1:
-    # Process user input
-    if user_question := st.chat_input(
-        placeholder="e.g., How can I improve soil health to grow tomatoes?",
-    ):
-        st.session_state.messages.append({"role": "user", "content": user_question})
-        with st.chat_message("user"):
-            st.markdown(user_question)
+# Process user input
+if user_question := st.chat_input(
+    placeholder="e.g., How can I improve soil health to grow tomatoes?",
+):
+    st.session_state.messages.append({"role": "user", "content": user_question})
+    with st.chat_message("user"):
+        st.markdown(user_question)
 
-        with st.chat_message("assistant"):
-            if not ollama_running:
-                st.warning(
-                    "⚠️ Ollama is not running. Please start Ollama to get responses."
+    with st.chat_message("assistant"):
+        if not ollama_running:
+            st.warning("⚠️ Ollama is not running. Please start Ollama to get responses.")
+        else:
+            try:
+                logging.info(f"Processing user question: {user_question}")
+
+                # Create progress indicator
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+
+                # Step 1: Retrieve relevant documents
+                status_text.text("🔍 Searching for relevant documents...")
+                progress_bar.progress(25)
+
+                retrieved_docs = st.session_state.vectorstore.similarity_search(
+                    user_question,
+                    k=2,  # Get more documents for better context
                 )
-            else:
-                try:
-                    logging.info(f"Processing user question: {user_question}")
 
-                    # Create progress indicator
-                    progress_bar = st.progress(0)
-                    status_text = st.empty()
+                logging.info(f"Retrieved {len(retrieved_docs)} documents")
 
-                    # Step 1: Retrieve relevant documents
-                    status_text.text("🔍 Searching for relevant documents...")
-                    progress_bar.progress(25)
+                # Step 2: Process documents
+                progress_bar.progress(50)
+                status_text.text("📄 Processing retrieved documents...")
 
-                    retrieved_docs = st.session_state.vectorstore.similarity_search(
-                        user_question,
-                        k=3,  # Get more documents for better context
+                if not retrieved_docs:
+                    st.warning(
+                        "❓ No relevant documents found. Try rephrasing your question or using more specific terms."
+                    )
+                    logging.warning("No documents retrieved for user question")
+                else:
+                    # Create context from retrieved docs
+                    context_texts = "\n\n".join(
+                        [
+                            f"Source: {doc.metadata.get('filename', 'Unknown')}\n{doc.page_content}"
+                            for doc in retrieved_docs
+                        ]
                     )
 
-                    logging.info(f"Retrieved {len(retrieved_docs)} documents")
+                    print("context being added", context_texts)
 
-                    # Step 2: Process documents
-                    progress_bar.progress(50)
-                    status_text.text("📄 Processing retrieved documents...")
+                    # Step 3: Generate response
+                    progress_bar.progress(75)
+                    status_text.text("🤖 Generating AI response...")
 
-                    if not retrieved_docs:
-                        st.warning(
-                            "❓ No relevant documents found. Try rephrasing your question or using more specific terms."
-                        )
-                        logging.warning("No documents retrieved for user question")
-                    else:
-                        # Create context from retrieved docs
-                        context_texts = "\n\n".join(
-                            [
-                                f"Source: {doc.metadata.get('filename', 'Unknown')}\n{doc.page_content}"
-                                for doc in retrieved_docs
-                            ]
-                        )
+                    # Load and format prompt
+                    prompt_template = load_prompt_template()
+                    prompt = prompt_template.format(
+                        combined_context=context_texts, user_question=user_question
+                    )
 
-                        print("context being added", context_texts)
+                    # Generate response
+                    logging.info(f"Generating response with model:{model_choice}")
 
-                        # Step 3: Generate response
-                        progress_bar.progress(75)
-                        status_text.text("🤖 Generating AI response...")
+                    response_start_time = time.time()
+                    llm_response = call_ollama(prompt, model_choice)
+                    response_end_time = time.time()
 
-                        # Load and format prompt
-                        prompt_template = load_prompt_template()
-                        prompt = prompt_template.format(
-                            combined_context=context_texts, user_question=user_question
-                        )
+                    # log response
+                    logging.info(f"response: {llm_response}")
 
-                        # Generate response
-                        logging.info(f"Generating response with model: {model_choice}")
+                    # Complete progress
+                    progress_bar.progress(100)
+                    status_text.text("✅ Response generated!")
 
-                        start_time = time.time()
-                        llm_response = call_ollama(prompt, model_choice)
-                        end_time = time.time()
+                    # Clear progress indicators
+                    time.sleep(0.5)
+                    progress_bar.empty()
+                    status_text.empty()
 
-                        # Complete progress
-                        progress_bar.progress(100)
-                        status_text.text("✅ Response generated!")
+                    # Display results
+                    response_time = response_end_time - response_start_time
+                    logging.info(f"Total response time: {response_time:2f} seconds")
 
-                        # Clear progress indicators
-                        time.sleep(0.5)
-                        progress_bar.empty()
-                        status_text.empty()
-
-                        # Display results
-                        response_time = end_time - start_time
-                        logging.info(
-                            f"Total response time: {response_time:.2f} seconds"
-                        )
-
-                        # Show response
-                        st.markdown("### 🎯 Answer")
+                    # Show response
+                    st.markdown("### 🎯 Answer")
+                    # Display assistant response
+                    with st.chat_message("assistant"):
                         st.markdown(llm_response)
 
-                        # Show metadata
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.metric("⏱️ Response Time", f"{response_time:.2f}s")
-                        with col2:
-                            st.metric("📚 Sources Found", len(retrieved_docs))
-                        with col3:
-                            st.metric("🤖 Model Used", model_choice)
+                        # Save AI response to persistent state
+                    st.session_state.messages.append(
+                        {"role": "assistant", "content": llm_response}
+                    )
 
-                        # Show debug info in expandable section
-                        with st.expander("🔍 Source Documents & Debug Info"):
-                            st.markdown("**Retrieved Documents:**")
-                            for i, doc in enumerate(retrieved_docs, 1):
-                                with st.container():
-                                    st.markdown(
-                                        f"**📄 Document {i}: {doc.metadata.get('filename', 'Unknown')}**"
-                                    )
-                                    st.markdown(
-                                        f"*Characters: {doc.metadata.get('char_count', 'N/A')} | Words: {doc.metadata.get('word_count', 'N/A')}*"
-                                    )
-                                    st.markdown(
-                                        f"```\n{doc.page_content[:300]}{'...' if len(doc.page_content) > 300 else ''}\n```"
-                                    )
-                                    st.markdown("---")
+            except Exception as e:
+                error_msg = f"Error processing your question: {str(e)}"
+                logging.error(error_msg)
+                st.error(f"❌ {error_msg}")
 
-                except Exception as e:
-                    error_msg = f"Error processing your question: {str(e)}"
-                    logging.error(error_msg)
-                    st.error(f"❌ {error_msg}")
-
-                with st.expander("🔧 Troubleshooting"):
-                    st.markdown("""
+            with st.expander("🔧 Troubleshooting"):
+                st.markdown("""
                         **Common solutions:**
                         1. **Restart the application** - Sometimes a fresh start helps
                         2. **Clear the cache** - Use the sidebar button to clear cached data
@@ -453,15 +482,42 @@ with col1:
                         5. **Update dependencies** - Make sure all packages are up to date
                         """)
 
-# Footer
-st.markdown("---")
-st.markdown(
-    "🌱 **Agriadvice** - Powered by AI for sustainable agriculture | "
-    f"Built with Streamlit • LangChain • FAISS • Ollama"
-)
 
-
+col1, col2, col3 = st.columns(3)
+with col1:
+    try:
+        st.metric("⏱️ Response Time", f"{response_time:.2f}s")
+    except:
+        print("no response time logged")
 with col2:
-    model_choice = st.selectbox(
-        "Model:", ["qwen2:0.5b", "qwen3:0.6b", "tinyllama"], index=0
-    )
+    try:
+        st.metric("📚 Sources Found", len(retrieved_docs))
+    except:
+        print("no docs retrieved")
+with col3:
+    st.metric("🤖 Model Used", model_choice)
+
+# Show debug info in expandable section
+try:
+    with st.expander("🔍 Source Documents & Debug Info"):
+        if retrieved_docs:
+            st.markdown("**Retrieved Documents:**")
+            for i, doc in enumerate(retrieved_docs, 1):
+                with st.container():
+                    st.markdown(
+                        f"**📄 Document {i}: {doc.metadata.get('filename', 'Unknown')}**"
+                    )
+                    st.markdown(
+                        f"*Characters: {doc.metadata.get('char_count', 'N/A')} | Words: {doc.metadata.get('word_count', 'N/A')}*"
+                    )
+                    st.markdown(
+                        f"```\n{doc.page_content[:300]}{'...' if len(doc.page_content) > 300 else ''}\n```"
+                    )
+                    st.markdown("---")
+except:
+    st.markdown("Ask a question to see retrieved documents")
+
+
+# Footer
+with st.bottom:
+    st.markdown("🌱 Advice Delivered Offline")
