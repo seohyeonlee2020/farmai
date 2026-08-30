@@ -1,6 +1,9 @@
 #training data (pdf files)
 training_data/
 
+#inactive files
+exploration/
+
 # Vector embeddings and processed data
 embeddings/
 *.db
