@@ -63,18 +63,18 @@ logging.basicConfig(
 def load_text_data():
     """Load text data from JSON file or extract from directory"""
     try:
-        if not os.path.exists("./text_data.json"):
-            directory = "./chatbot_training_data"
+        if not os.path.exists("./disaster_relief_text_data.json"):
+            directory = "./disaster_relief_training_data"
             if not os.path.exists(directory):
                 st.error(f"Training data directory '{directory}' not found!")
                 return {}
 
             text_data = extract_text(directory)
-            with open("text_data.json", "w", encoding="utf-8") as fp:
+            with open("disaster_relief_text_data.json", "w", encoding="utf-8") as fp:
                 json.dump(text_data, fp, ensure_ascii=False, indent=2)
             return text_data
         else:
-            with open("text_data.json", "r", encoding="utf-8") as f:
+            with open("disaster_relief_text_data.json", "r", encoding="utf-8") as f:
                 text_data = json.load(f)
                 return text_data
     except Exception as e:
@@ -194,7 +194,7 @@ def create_save_vectorstore():
         vectorstore = FAISS.from_documents(documents=documents, embedding=embeddings)
 
         # Persist FAISS
-        index_path = "./faiss_index"
+        index_path = "./disaster_relief_faiss_index"
         vectorstore.save_local(index_path)
         print(f"Index saved to {index_path}")
 
@@ -375,7 +375,7 @@ for message in st.session_state.messages:
 
 # Process user input
 if user_question := st.chat_input(
-    placeholder="e.g., How can I improve soil health to grow tomatoes?",
+    placeholder="Heatwave safety tips?",
 ):
     st.session_state.messages.append({"role": "user", "content": user_question})
     with st.chat_message("user"):
