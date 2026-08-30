@@ -221,7 +221,6 @@ class ChatbotEngine:
             index_path=INDEX_PATH, embeddings=self.embeddings
         )
 
-    # TODO: incorporate model choice
     def retrieve_relevant_context(self, user_question: str, k: int = 2) -> str:
         # 1. Similarity search
         retrieval_start_time = time.time()
@@ -251,6 +250,8 @@ class ChatbotEngine:
                 "output": context_from_retrieved_docs,
                 "retrieval_success": retrieval_success,
                 "retrieval_time": retrieval_time,
+                "retrieval_k": k,
+                "retrieved_docs": retrieved_docs,
             }
 
     def dynamically_generate_context(self, context_from_retrieved_docs, user_question):

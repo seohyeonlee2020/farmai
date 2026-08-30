@@ -22,6 +22,11 @@ faulthandler.enable()
 warnings.filterwarnings("ignore", category=UserWarning, module="google.protobuf")
 warnings.filterwarnings("ignore", category=FutureWarning)
 
+# get latest file
+
+train_dir = "./disaster_relief_text_data"
+text_json = "disaster_relief_text_data.json"
+
 # Import text preprocessing utility
 try:
     from utils.text_data_preprocessing import extract_text
@@ -60,21 +65,18 @@ logging.basicConfig(
 
 
 @st.cache_data
-def load_text_data():
+def load_text_data(train_dir, text_filename):
     """Load text data from JSON file or extract from directory"""
     try:
-        if not os.path.exists("./text_data.json"):
-            directory = "./chatbot_training_data"
-            if not os.path.exists(directory):
-                st.error(f"Training data directory '{directory}' not found!")
-                return {}
+        if not os.path.exists(train_dir):
+            print("json file not found, creating one")
 
-            text_data = extract_text(directory)
-            with open("text_data.json", "w", encoding="utf-8") as fp:
-                json.dump(text_data, fp, ensure_ascii=False, indent=2)
+            text_data = extract_text(train_dir)
+            with open(text_filename, "w", encoding="utf-8") as fp:
+                json.dump(text_data, fp, ensure_ascii=False, indent=4)
             return text_data
         else:
-            with open("text_data.json", "r", encoding="utf-8") as f:
+            with open(text_filename, "r", encoding="utf-8") as f:
                 text_data = json.load(f)
                 return text_data
     except Exception as e:
@@ -124,14 +126,14 @@ def dict_to_documents(file_dict):
 def prepare_documents():
     """Convert text data to chunked documents"""
     try:
-        text_data = load_text_data()
+        text_data = load_text_data(train_dir, "disaster_relief_text_data.json")
         if not text_data:
-            st.error("No text data available for processing")
+            logging.warning("No text data available for processing")
             return []
 
         data = dict_to_documents(text_data)
         if not data:
-            st.error("No valid documents created from text data")
+            logging.warning("No valid documents created from text data")
             return []
 
         # Use smaller chunks for better retrieval with overlapping
@@ -148,8 +150,8 @@ def prepare_documents():
         return split_docs
 
     except Exception as e:
-        st.error(f"Error preparing documents: {str(e)}")
-        logging.error(f"Error in prepare_documents: {str(e)}")
+        # st.error(f"Error preparing documents: {str(e)}")
+        logging.error(f" in prepare_documents: {str(e)}")
         return []
 
 
@@ -159,6 +161,7 @@ def create_embeddings():
     try:
         model_name = "all-MiniLM-L6-v2"
         cache_path = "./model_weights"
+
         # Initialize and save embeddings
         embeddings = HuggingFaceEmbeddings(
             model_name=model_name,
@@ -171,7 +174,7 @@ def create_embeddings():
 
     except Exception as e:
         error_msg = f"Error creating embeddings: {str(e)}"
-        st.error(error_msg)
+        #  st.error(error_msg)
         logging.error(error_msg)
         raise
 
@@ -194,7 +197,7 @@ def create_save_vectorstore():
         vectorstore = FAISS.from_documents(documents=documents, embedding=embeddings)
 
         # Persist FAISS
-        index_path = "./faiss_index"
+        index_path = "./disaster_relief_faiss_index"
         vectorstore.save_local(index_path)
         print(f"Index saved to {index_path}")
 
@@ -375,7 +378,7 @@ for message in st.session_state.messages:
 
 # Process user input
 if user_question := st.chat_input(
-    placeholder="e.g., How can I improve soil health to grow tomatoes?",
+    placeholder="Heatwave safety tips?",
 ):
     st.session_state.messages.append({"role": "user", "content": user_question})
     with st.chat_message("user"):

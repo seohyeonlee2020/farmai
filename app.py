@@ -110,10 +110,11 @@ if user_question := st.chat_input(
                 status_text.text("🔍 Searching for relevant documents...")
                 progress_bar.progress(25)
                 output = engine.retrieve_relevant_context(user_question)
-                logging.info(f"output retrieval: {output}")
                 context_from_retrieved_docs = output["output"]
                 retrieval_success = output["retrieval_success"]
+                num_of_retrieved_docs = output["retrieval_k"]
                 retrieval_time = output["retrieval_time"]
+                retrieved_docs = output["retrieved_docs"]
 
                 if not retrieval_success:
                     st.warning(
@@ -152,9 +153,6 @@ if user_question := st.chat_input(
                 progress_bar.empty()
                 status_text.empty()
 
-                # Display results
-                # response_time = response_end_time - response_start_time
-
                 # Show response
                 st.markdown("### 🎯 Answer")
                 # Display assistant response
@@ -166,7 +164,53 @@ if user_question := st.chat_input(
                     {"role": "assistant", "content": model_response}
                 )
 
+                # display performance metrics
+                if model_response:
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        try:
+                            st.metric("⏱️ Response Time", f"{response_time:.2f}s")
+                        except:
+                            print("no response time logged")
+                    with col2:
+                        try:
+                            st.metric("📚 Sources Found", num_of_retrieved_docs)
+                        except:
+                            print("no docs retrieved")
+                    with col3:
+                        st.metric("🤖 Model Used", user_model_choice)
+
+                    # Show debug info in expandable section
+                    try:
+                        with st.expander("🔍 Source Documents & Debug Info"):
+                            if retrieval_success:
+                                st.markdown("**Retrieved Documents:**")
+                                for i, doc in enumerate(retrieved_docs, 1):
+                                    with st.container():
+                                        st.markdown(
+                                            f"**📄 Document {i}: {doc.metadata.get('filename', 'Unknown')}**"
+                                        )
+                                        st.markdown(
+                                            f"*Characters: {doc.metadata.get('char_count', 'N/A')} | Words: {doc.metadata.get('word_count', 'N/A')}*"
+                                        )
+                                        st.markdown(
+                                            f"```\n{doc.page_content[:300]}{'...' if len(doc.page_content) > 300 else ''}\n```"
+                                        )
+                                        st.markdown("---")
+                    except:
+                        st.markdown("Ask a question to see retrieved documents")
+
             except Exception as e:
                 error_msg = f"Error processing your question: {str(e)}"
                 logging.error(error_msg)
                 st.error(error_msg)
+
+            with st.expander("🔧 Troubleshooting"):
+                st.markdown("""
+                        **Common solutions:**
+                        1. **Restart the application** - Sometimes a fresh start helps
+                        2. **Clear the cache** - Use the sidebar button to clear cached data
+                        3. **Check Ollama** - Ensure Ollama is running and responsive
+                        4. **Verify data files** - Ensure training data directory exists
+                        5. **Update dependencies** - Make sure all packages are up to date
+                        """)
