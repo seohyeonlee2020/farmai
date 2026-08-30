@@ -1,5 +1,5 @@
 #training data (pdf files)
-farmai_training_data/
+training_data/
 
 # Vector embeddings and processed data
 embeddings/
