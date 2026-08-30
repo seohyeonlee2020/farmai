@@ -19,7 +19,6 @@ Everything stays offline.
 - **RAG only**: Sticks to input data to prevent hallucinations.
 - **Open source components only**: Removes financial barriers and prevents vendor lock-in.
 - English for MVP; will scale to multiple languages.
-- Shared laptop target fits digital divide—avoids assuming personal phones.
 
 ## Setup
 ```
