@@ -102,7 +102,6 @@ if user_question := st.chat_input(
         else:
             try:
                 logging.info(f"Processing user question: {user_question}")
-
                 # Create progress indicator
                 progress_bar = st.progress(0)
                 status_text = st.empty()
@@ -110,19 +109,43 @@ if user_question := st.chat_input(
                 # Step 1: Retrieve relevant documents
                 status_text.text("🔍 Searching for relevant documents...")
                 progress_bar.progress(25)
+                output = engine.retrieve_relevant_context(user_question)
+                logging.info(f"output retrieval: {output}")
+                context_from_retrieved_docs = output["output"]
+                retrieval_success = output["retrieval_success"]
+                retrieval_time = output["retrieval_time"]
 
-                # Step 3: Generate response
-                progress_bar.progress(75)
-                status_text.text("🤖 Generating AI response...")
+                if not retrieval_success:
+                    st.warning(
+                        "❓ No relevant documents found. Try rephrasing your question or using more specific terms."
+                    )
+                    logging.warning("No documents retrieved for user question")
+                else:
+                    # Step 2: combine retrieved docs, user question, and prompt template to generate context given to sLM
+                    prompt = engine.dynamically_generate_context(
+                        context_from_retrieved_docs, user_question
+                    )
 
-                model_response = engine.query(user_question, user_model_choice)
+                    # Step 3: Generate response
+                    progress_bar.progress(75)
+                    status_text.text("🤖 Generating AI response...")
 
-                # Complete progress
-                progress_bar.progress(100)
-                status_text.text("✅ Response generated!")
+                    output = engine.get_model_response(
+                        prompt, answering_model=user_model_choice
+                    )
 
-                # log response
-                logging.info(f"response: {model_response}")
+                    model_response = output["output"]
+                    response_time = output["response_time"]
+
+                    # model_response = engine.query(user_question, answering_model=user_model_choice)
+
+                    # Complete progress
+                    progress_bar.progress(100)
+                    status_text.text("✅ Response generated!")
+                    logging.info(f"Total response time: {response_time:2f} seconds")
+
+                    # log response
+                    logging.info(f"response: {model_response}")
 
                 # Clear progress indicators
                 time.sleep(0.5)
@@ -131,7 +154,6 @@ if user_question := st.chat_input(
 
                 # Display results
                 # response_time = response_end_time - response_start_time
-                logging.info(f"Total response time: {response_time:2f} seconds")
 
                 # Show response
                 st.markdown("### 🎯 Answer")

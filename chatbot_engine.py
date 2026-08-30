@@ -222,38 +222,49 @@ class ChatbotEngine:
         )
 
     # TODO: incorporate model choice
-    def generate_model_context(
-        self, k: int = 2, user_question: str = "heatwave safety tips"
-    ) -> str:
+    def retrieve_relevant_context(self, user_question: str, k: int = 2) -> str:
         # 1. Similarity search
+        retrieval_start_time = time.time()
         retrieved_docs = self.vectorstore.similarity_search(user_question, k=k)
-        logging.info(f"Retrieved {len(retrieved_docs)} documents")
+        retrieval_end_time = time.time()
+        retrieval_time = retrieval_end_time - retrieval_start_time
+        logging.info(
+            f"Retrieved {len(retrieved_docs)} documents in {retrieval_time:2f} seconds, retrieved content: {retrieved_docs}"
+        )
 
         if not retrieved_docs:
-            logging.warning("No documents retrieved for user question")
+            retrieval_time = 0
+            retrieval_success = False
+            logging.warning(f"No documents retrieved for user question {user_question}")
 
         else:
+            retrieval_success = True
             # Create context from retrieved docs
             context_from_retrieved_docs = "\n\n".join(
                 [
                     f"Source: {doc.metadata.get('filename', 'Unknown')}\n{doc.page_content}"
-                    for doc in context_from_retrieved_docs
+                    for doc in retrieved_docs
                 ]
             )
             print("context being added", context_from_retrieved_docs)
-            return context_from_retrieved_docs
+            return {
+                "output": context_from_retrieved_docs,
+                "retrieval_success": retrieval_success,
+                "retrieval_time": retrieval_time,
+            }
 
-    def dynamically_generate_context(context_from_retrieved_docs, user_question: str = "heatwave safety tips")
-            # load and format prompt
-            prompt_template = load_prompt_template()
-            prompt = prompt_template.format(
-                combined_context=context_from_retrieved_docs, user_question=user_question
-            )
-            # return dynamically combined prompt
-            return prompt
+    def dynamically_generate_context(self, context_from_retrieved_docs, user_question):
+        # load and format prompt
+        prompt_template = load_prompt_template()
+        prompt = prompt_template.format(
+            combined_context=context_from_retrieved_docs, user_question=user_question
+        )
+        # return dynamically combined prompt
+        return prompt
 
-    def get_model_response(prompt, answering_model):
+    def get_model_response(self, prompt, answering_model):
         try:
+            response_start_time = time.time()
             response = requests.post(
                 "http://localhost:11434/api/generate",
                 json={
@@ -268,22 +279,35 @@ class ChatbotEngine:
                     },
                     "keep_alive": 0,
                 },
-                timeout=60,  # Increased timeout for model processing
+                timeout=40,  # Increased timeout to 60s to allow for processing time -> decreased back to 40s
             )
+            response_end_time = time.time()
+            response_time = response_end_time - response_start_time
 
             if response.status_code == 200:
                 result = response.json()
-                return result.get("response", "No response generated")
+                response_success = True
+                return {
+                    "output": result.get("response", "No response generated"),
+                    "response_success": response_success,
+                    "response_time": response_time,
+                }
             else:
-                return (
-                    f"Ollama API Error: HTTP {response.status_code} - {response.text}"
-                )
+                response_success = False
+                return {
+                    "output": f"Ollama API Error: HTTP {response.status_code} - {response.text}",
+                    "response_success": response_success,
+                    "response_time": response_time,
+                }
 
         except requests.exceptions.Timeout:
+            response_success = False
             return "Request timed out. The model might be processing a complex query."
         except requests.exceptions.ConnectionError:
+            response_success = False
             return "Cannot connect to Ollama. Please ensure Ollama is running."
         except Exception as e:
+            response_success = False
             return f"Chatbot Error: {str(e)}"
 
 
@@ -324,5 +348,5 @@ class ChatbotEngine:
         return model_response
 """
 
-engine = ChatbotEngine()
-engine.query("heatwave safety tips")
+# engine = ChatbotEngine()
+# engine.query("heatwave safety tips")

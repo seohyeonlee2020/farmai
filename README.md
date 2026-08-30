@@ -1,26 +1,23 @@
-# AgriAdvice: Offline RAG chatbot to address the digital divide
-
-App for smallholder farmers needing climate-adapted advice without internet. Scaled ambitious idea from a classmate ("AI on flip phone offline") to a technologically viable architecture. Uses RAG with a small language model to keep answers evidence-based. Optimized for extremely low-resource contexts. Focused on gaps like limited device access and unreliable internet connectivity.
-
-<img width="400" height="auto" alt="offline_rag_architecture" src="https://github.com/user-attachments/assets/6f8e5f77-9ec3-4f94-a35a-105b1f436af3" />
+# Offline RAG chatbot that works on your laptop
+Frontier AI models are only usable with high-speed internet and robust compute power. These requirements are not compatible with edge computing use cases where internet connectivity and cost are significant bottlenecks. Additionally, the majority of frontier models are hosted on clouds, which raise privacy concerns for use cases involving personal or proprietary information.
 
 ## How It Works
-Designed in two phases for low-connectivity areas.
+Everything stays offline.
 
 **Setup (online, one-time, maybe intermittent upgrades)**:
-- Extract text from 20-30 farming manuals using pypdf (text OCR) and pytesseract (image extraction). 
+- Extract text from 20-30 sources of your choice using pypdf (text OCR) and pytesseract (image extraction).
 - Embed 20-30 PDFs using Hugging Face models.
 - Create vectorstore.
 
 **Offline use (laptops)**:
 - small language model runs queries on embedded data. No internet needed.
-- RAG setup: Model only uses retrieved docs to avoid hallucinations and false advice. 
+- RAG setup: Model only uses retrieved docs to avoid hallucinations and false advice.
 - All open-source, no vendor costs.
 
 ## Tech Choices for Offline Architecture
-- **Small Language Model**: Lightweight enough for CPU on most laptops. 
+- **Small Language Model**: Lightweight enough for CPU on most laptops.
 - **RAG only**: Sticks to input data to prevent hallucinations.
-- **Open source components only**: Removes financial barriers and prevents vendor lock-in. 
+- **Open source components only**: Removes financial barriers and prevents vendor lock-in.
 - English for MVP; will scale to multiple languages.
 - Shared laptop target fits digital divide—avoids assuming personal phones.
 
@@ -31,7 +28,7 @@ git clone seohyeonlee2020/offline-rag-chatbot.git
 pip install -r requirements.txt
 
 # Run offline on localhost
-streamlit run agriadvice_ver1.py  
+streamlit run app.py
 ```
 
 ## Next Steps
